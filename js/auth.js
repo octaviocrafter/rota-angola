@@ -57,7 +57,10 @@ async function loginForm(form) {
   const email = emailFromForm(form);
   const password = clean(form.querySelector('[name="password"]')?.value);
   await signInWithEmailAndPassword(auth, email, password);
-  const redirect = form.dataset.redirect || '../';
+  // O perfil no Firestore decide o painel; o navegador não escolhe permissões.
+  const profile = await getDoc(doc(db, 'users', auth.currentUser.uid));
+  const role = profile.exists() ? profile.data().role : '';
+  const redirect = form.dataset.redirect || (role === 'driver' ? 'painel-motorista.html' : role === 'passenger' ? 'painel-passageiro.html' : role === 'admin' ? 'painel-admin.html' : '../');
   window.location.href = redirect;
 }
 
