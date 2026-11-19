@@ -57,7 +57,7 @@ async function loginForm(form) {
   const email = emailFromForm(form);
   const password = clean(form.querySelector('[name="password"]')?.value);
   await signInWithEmailAndPassword(auth, email, password);
-  const redirect = form.dataset.redirect || '/';
+  const redirect = form.dataset.redirect || '../';
   window.location.href = redirect;
 }
 
@@ -75,17 +75,17 @@ function bindForms() {
     try { await loginForm(form); }
     catch (error) { showMessage(error.code === 'auth/invalid-credential' ? 'E-mail ou palavra-passe incorrectos.' : (error.message || 'Não foi possível iniciar sessão.'), 'error'); }
   }));
-  document.querySelectorAll('[data-logout]').forEach((button) => button.addEventListener('click', () => signOut(auth).then(() => { window.location.href = '/'; })));
+  document.querySelectorAll('[data-logout]').forEach((button) => button.addEventListener('click', () => signOut(auth).then(() => { window.location.href = '../'; })));
 }
 
 async function guardAdminPage() {
   if (!document.body.dataset.adminPage) return;
   onAuthStateChanged(auth, async (user) => {
-    if (!user) { window.location.href = '/pages/login-admin.html'; return; }
+    if (!user) { window.location.href = '../pages/login-admin.html'; return; }
     const profile = await getDoc(doc(db, 'users', user.uid));
     const data = profile.exists() ? profile.data() : {};
     const principal = user.email?.toLowerCase() === PRINCIPAL_EMAIL;
-    if (data.role !== 'admin' && !principal) { await signOut(auth); window.location.href = '/pages/login-admin.html?erro=sem-permissao'; return; }
+    if (data.role !== 'admin' && !principal) { await signOut(auth); window.location.href = '../pages/login-admin.html?erro=sem-permissao'; return; }
     document.querySelectorAll('[data-admin-email]').forEach((node) => { node.textContent = user.email || ''; });
     document.querySelectorAll('[data-principal-only]').forEach((node) => { node.hidden = !principal; });
     document.body.dataset.adminRole = principal ? 'principal' : 'admin';
