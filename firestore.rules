@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function principal() { return signedIn() && request.auth.token.email == 'octaviomagrelo940@gmail.com'; }
+    function activeAdmin() {
+      return signedIn() && (principal() || (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true
+      ));
+    }
+    function ownUser() { return signedIn() && request.auth.uid == userId; }
+
+    match /users/{userId} {
+      allow create: if signedIn() && request.auth.uid == userId && request.resource.data.role in ['passenger', 'driver'];
+      allow read: if signedIn() && (request.auth.uid == userId || activeAdmin());
+      allow update: if principal() || (signedIn() && request.auth.uid == userId && request.resource.data.role == resource.data.role);
+      allow delete: if principal();
+    }
+
+    match /drivers/{driverId} {
+      allow create: if signedIn() && request.auth.uid == driverId;
+      allow read: if activeAdmin() || (signedIn() && resource.data.status == 'approved');
+      allow update: if activeAdmin() || (signedIn() && request.auth.uid == driverId && request.resource.data.status == resource.data.status);
+      allow delete: if principal();
+    }
+
+    match /locations/{driverId} {
+      allow create, update: if signedIn() && request.auth.uid == driverId;
+      allow read: if signedIn();
+      allow delete: if signedIn() && request.auth.uid == driverId;
+    }
+
+    match /reservations/{reservationId} {
+      allow create: if signedIn() && request.resource.data.passengerId == request.auth.uid;
+      allow read: if signedIn() && (resource.data.passengerId == request.auth.uid || resource.data.driverId == request.auth.uid || activeAdmin());
+      allow update: if signedIn() && (resource.data.passengerId == request.auth.uid || resource.data.driverId == request.auth.uid || activeAdmin());
+    }
+
+    match /sosAlerts/{alertId} {
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if activeAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+    }
+  }
+}
