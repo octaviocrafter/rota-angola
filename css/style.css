@@ -4,9 +4,15 @@
 .form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}.form-grid label{font-size:12px;font-weight:800;color:var(--muted)}.form-grid input,.form-grid select{display:block;width:100%;margin-top:7px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);border-radius:10px;padding:12px;outline:0}.form-grid input:focus,.form-grid select:focus{border-color:var(--orange)}.form-grid .safety-strip,.form-grid button{grid-column:1/-1}@media(max-width:560px){.form-grid{grid-template-columns:1fr}}
 
 .topbar {
-  /* mantenha o que já lá está (position: sticky; top: 0; etc.) */
-  z-index: 1000; /* Adicione esta linha */
+  /* Mantém o que já tens aqui (position, background, etc.) */
+  z-index: 9999 !important; /* Adiciona ou atualiza esta linha */
 }
+
+.map-panel {
+  /* Mantém o que já tens aqui */
+  position: relative; /* Adiciona esta linha */
+  z-index: 1;         /* Adiciona esta linha */
+  }
 
 *[hidden]{display:none!important}
 .province-list{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 25px}.province-list span{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:100px;padding:6px 9px;background:var(--surface-2)}
