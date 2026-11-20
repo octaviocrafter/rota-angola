@@ -51,9 +51,10 @@ function renderDrivers(list = liveDrivers.length ? liveDrivers : DEMO_DRIVERS) {
   if (!root) return;
   root.innerHTML = list.map((driver) => {
     const eta = estimateArrival(driver);
-    return `<article class="driver-card" data-driver="${escapeHtml(driver.id)}"><div class="driver-top"><span class="avatar">${escapeHtml(driver.initials)}</span><div><strong>${escapeHtml(driver.name)}</strong><small>${escapeHtml(driver.type)} · ${escapeHtml(driver.route)}</small></div></div><div class="driver-meta"><span>Chegada: ${escapeHtml(eta.label)} · ${escapeHtml(eta.distance)}</span><span class="plate">${escapeHtml(driver.plate)}</span></div></article>`;
+    return `<article class="driver-card" data-driver="${escapeHtml(driver.id)}"><div class="driver-top"><span class="avatar">${escapeHtml(driver.initials)}</span><div><strong>${escapeHtml(driver.name)}</strong><small>${escapeHtml(driver.type)} · ${escapeHtml(driver.route)}</small></div></div><div class="driver-meta"><span>Chegada: ${escapeHtml(eta.label)} · ${escapeHtml(eta.distance)}</span><span class="plate">${escapeHtml(driver.plate)}</span></div>${driver.demo ? '<small>Transporte ilustrativo · sem reservas reais</small>' : '<button class="btn btn-primary" type="button" data-book-driver>Reservar lugar</button>'}</article>`;
   }).join('');
   root.querySelectorAll('[data-driver]').forEach((element) => element.addEventListener('click', () => focusDriver(element.dataset.driver)));
+  root.querySelectorAll('[data-book-driver]').forEach((button) => button.addEventListener('click', (event) => { event.stopPropagation(); const id = button.closest('[data-driver]')?.dataset.driver; const driver = list.find((item) => String(item.id) === String(id)); window.reserveDriver?.(driver); }));
   const count = document.querySelector('#result-count');
   if (count) count.textContent = list.length;
 }

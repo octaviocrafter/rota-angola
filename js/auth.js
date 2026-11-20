@@ -60,7 +60,9 @@ async function loginForm(form) {
   // O perfil no Firestore decide o painel; o navegador não escolhe permissões.
   const profile = await getDoc(doc(db, 'users', auth.currentUser.uid));
   const role = profile.exists() ? profile.data().role : '';
-  const redirect = form.dataset.redirect || (role === 'driver' ? 'painel-motorista.html' : role === 'passenger' ? 'painel-passageiro.html' : role === 'admin' ? 'painel-admin.html' : '../');
+  // O e-mail principal também é reconhecido sem depender de um documento de perfil pré-criado.
+  const isPrincipal = email === PRINCIPAL_EMAIL;
+  const redirect = form.dataset.redirect || (isPrincipal || role === 'admin' ? 'painel-admin.html' : role === 'driver' ? 'painel-motorista.html' : role === 'passenger' ? 'painel-passageiro.html' : '../');
   window.location.href = redirect;
 }
 

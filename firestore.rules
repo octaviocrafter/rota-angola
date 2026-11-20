@@ -34,7 +34,8 @@ service cloud.firestore {
     match /reservations/{reservationId} {
       allow create: if signedIn() && request.resource.data.passengerId == request.auth.uid;
       allow read: if signedIn() && (resource.data.passengerId == request.auth.uid || resource.data.driverId == request.auth.uid || activeAdmin());
-      allow update: if signedIn() && (resource.data.passengerId == request.auth.uid || resource.data.driverId == request.auth.uid || activeAdmin());
+      // O passageiro pode cancelar; a confirmação só pode ser feita pelo motorista associado ou por um administrador.
+      allow update: if activeAdmin() || (signedIn() && resource.data.driverId == request.auth.uid && request.resource.data.passengerId == resource.data.passengerId) || (signedIn() && resource.data.passengerId == request.auth.uid && request.resource.data.status == 'cancelled');
     }
 
     match /sosAlerts/{alertId} {

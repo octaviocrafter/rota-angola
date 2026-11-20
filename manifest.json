@@ -1,8 +1,9 @@
 {
   "name": "ROTA — Só rota e segurança",
   "short_name": "ROTA",
+  "id": "./",
   "description": "Rotas e segurança para passageiros em toda Angola.",
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#07111f",
