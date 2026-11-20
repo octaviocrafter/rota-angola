@@ -1,6 +1,6 @@
 import {
   auth, db, onAuthStateChanged, createUserWithEmailAndPassword,
-  signInWithEmailAndPassword, signOut, updateProfile, doc, setDoc,
+  signInWithEmailAndPassword, signOut, updateProfile, deleteUser, sendPasswordResetEmail, doc, setDoc,
   getDoc, collection, addDoc, serverTimestamp
 } from '../db/firebase.js';
 
@@ -46,11 +46,17 @@ async function registerProfile(form) {
       route: clean(data.route), line: clean(data.line), status: 'pending', locationSharing: false
     });
   }
-  await setDoc(doc(db, 'users', uid), profile);
-  if (role === 'driver') await setDoc(doc(db, 'drivers', uid), { ...profile, updatedAt: serverTimestamp() });
-  await updateProfile(credential.user, { displayName: profile.name });
-  showMessage('Conta criada. O cadastro foi guardado no Firestore e o motorista aguarda aprovação.', 'success');
-  form.reset();
+  try {
+    await setDoc(doc(db, 'users', uid), profile);
+    if (role === 'driver') await setDoc(doc(db, 'drivers', uid), { ...profile, updatedAt: serverTimestamp() });
+    await updateProfile(credential.user, { displayName: profile.name });
+    showMessage('Conta criada. O cadastro foi guardado no Firestore e o motorista aguarda aprovação.', 'success');
+    form.reset();
+  } catch (error) {
+    // Evita deixar no Authentication uma conta sem perfil quando as regras recusam a gravação.
+    try { await deleteUser(credential.user); } catch (cleanupError) { console.warn('[ROTA] limpeza da conta incompleta falhou:', cleanupError); }
+    throw error;
+  }
 }
 
 async function loginForm(form) {
@@ -78,7 +84,13 @@ function bindForms() {
   document.querySelectorAll('[data-login-form]').forEach((form) => form.addEventListener('submit', async (event) => {
     event.preventDefault();
     try { await loginForm(form); }
-    catch (error) { showMessage(error.code === 'auth/invalid-credential' ? 'E-mail ou palavra-passe incorrectos.' : (error.message || 'Não foi possível iniciar sessão.'), 'error'); }
+    catch (error) { showMessage(error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' ? 'E-mail ou palavra-passe incorrectos.' : (error.message || 'Não foi possível iniciar sessão.'), 'error'); }
+  }));
+  document.querySelectorAll('[data-reset-password]').forEach((button) => button.addEventListener('click', async () => {
+    const form = button.closest('form'); const email = emailFromForm(form);
+    if (!email) { showMessage('Escreva primeiro o seu e-mail para receber a recuperação da palavra-passe.', 'error'); return; }
+    try { await sendPasswordResetEmail(auth, email); showMessage('Enviámos um link de recuperação para o seu e-mail.', 'success'); }
+    catch (error) { showMessage(error.code === 'auth/user-not-found' ? 'Não existe uma conta com este e-mail.' : (error.message || 'Não foi possível enviar a recuperação.'), 'error'); }
   }));
   document.querySelectorAll('[data-logout]').forEach((button) => button.addEventListener('click', () => signOut(auth).then(() => { window.location.href = '../'; })));
 }

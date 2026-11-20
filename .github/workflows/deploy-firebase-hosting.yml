@@ -23,3 +23,11 @@ jobs:
           projectId: rota-angola
           channelId: live
           entryPoint: .
+
+      # As regras Firestore são independentes do Hosting e precisam de deploy explícito.
+      - name: Publicar regras Firestore
+        uses: w9jds/firebase-action@v13
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        with:
+          args: deploy --only firestore:rules --project rota-angola
