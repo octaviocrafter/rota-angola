@@ -25,9 +25,10 @@ jobs:
           entryPoint: .
 
       # As regras Firestore são independentes do Hosting e precisam de deploy explícito.
-      - name: Publicar regras Firestore
-        uses: w9jds/firebase-action@v13
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Autenticar Google Cloud para Firestore
+        uses: google-github-actions/auth@v2
         with:
-          args: deploy --only firestore:rules --project rota-angola
+          credentials_json: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+
+      - name: Publicar regras Firestore
+        run: npx --yes firebase-tools@13 deploy --only firestore:rules --project rota-angola --non-interactive
