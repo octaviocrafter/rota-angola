@@ -12,9 +12,9 @@ service cloud.firestore {
     function ownUser() { return signedIn() && request.auth.uid == userId; }
 
     match /users/{userId} {
-      allow create: if signedIn() && request.auth.uid == userId && request.resource.data.role in ['passenger', 'driver'];
+      allow create: if (signedIn() && request.auth.uid == userId && request.resource.data.role in ['passenger', 'driver']) || (principal() && request.resource.data.role == 'admin');
       allow read: if signedIn() && (request.auth.uid == userId || activeAdmin());
-      allow update: if principal() || (signedIn() && request.auth.uid == userId && request.resource.data.role == resource.data.role);
+      allow update: if principal() || (activeAdmin() && request.resource.data.role == resource.data.role && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['driverStatus'])) || (signedIn() && request.auth.uid == userId && request.resource.data.role == resource.data.role);
       allow delete: if principal();
     }
 

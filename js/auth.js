@@ -24,6 +24,28 @@ function emailFromForm(form) {
   return clean(form.querySelector('[name="email"]')?.value).toLowerCase();
 }
 
+function dashboardPath(role, principal) {
+  return principal || role === 'admin' ? 'pages/painel-admin.html' : role === 'driver' ? 'pages/painel-motorista.html' : 'pages/painel-passageiro.html';
+}
+
+function setupSessionUI() {
+  const guestNodes = document.querySelectorAll('[data-auth-guest]');
+  const userNodes = document.querySelectorAll('[data-auth-user]');
+  if (!guestNodes.length && !userNodes.length) return;
+  onAuthStateChanged(auth, async (user) => {
+    guestNodes.forEach((node) => { node.hidden = Boolean(user); });
+    userNodes.forEach((node) => { node.hidden = !user; });
+    if (!user) return;
+    const profileSnapshot = await getDoc(doc(db, 'users', user.uid));
+    const profile = profileSnapshot.exists() ? profileSnapshot.data() : {};
+    const principal = user.email?.toLowerCase() === PRINCIPAL_EMAIL;
+    const destination = dashboardPath(profile.role, principal);
+    document.querySelectorAll('[data-account-link]').forEach((node) => { node.href = destination; });
+    document.querySelectorAll('[data-auth-name]').forEach((node) => { node.textContent = profile.name || user.displayName || user.email?.split('@')[0] || 'utilizador'; });
+    document.querySelectorAll('[data-auth-logout]').forEach((button) => button.onclick = async () => { await signOut(auth); window.location.href = './'; });
+  });
+}
+
 async function registerProfile(form) {
   const data = Object.fromEntries(new FormData(form).entries());
   const email = clean(data.email).toLowerCase();
@@ -98,11 +120,11 @@ function bindForms() {
 async function guardAdminPage() {
   if (!document.body.dataset.adminPage) return;
   onAuthStateChanged(auth, async (user) => {
-    if (!user) { window.location.href = '../pages/login-admin.html'; return; }
+    if (!user) { window.location.href = '../pages/login.html'; return; }
     const profile = await getDoc(doc(db, 'users', user.uid));
     const data = profile.exists() ? profile.data() : {};
     const principal = user.email?.toLowerCase() === PRINCIPAL_EMAIL;
-    if (data.role !== 'admin' && !principal) { await signOut(auth); window.location.href = '../pages/login-admin.html?erro=sem-permissao'; return; }
+    if (data.role !== 'admin' && !principal) { await signOut(auth); window.location.href = '../pages/login.html?erro=sem-permissao'; return; }
     document.querySelectorAll('[data-admin-email]').forEach((node) => { node.textContent = user.email || ''; });
     document.querySelectorAll('[data-principal-only]').forEach((node) => { node.hidden = !principal; });
     document.body.dataset.adminRole = principal ? 'principal' : 'admin';
@@ -111,5 +133,6 @@ async function guardAdminPage() {
 }
 
 bindForms();
+setupSessionUI();
 guardAdminPage();
 export { PRINCIPAL_EMAIL, showMessage, auth, db, addDoc, collection, serverTimestamp };
