@@ -90,7 +90,9 @@ async function loginForm(form) {
   const role = profile.exists() ? profile.data().role : '';
   // O e-mail principal também é reconhecido sem depender de um documento de perfil pré-criado.
   const isPrincipal = email === PRINCIPAL_EMAIL;
-  const redirect = form.dataset.redirect || (isPrincipal || role === 'admin' ? 'painel-admin.html' : role === 'driver' ? 'painel-motorista.html' : role === 'passenger' ? 'painel-passageiro.html' : '../');
+  // O Hosting está configurado com cleanUrls; navegar directamente sem .html
+  // evita a cadeia de redireccionamento que pode falhar em alguns telemóveis/PWA.
+  const redirect = form.dataset.redirect || (isPrincipal || role === 'admin' ? 'painel-admin' : role === 'driver' ? 'painel-motorista' : role === 'passenger' ? 'painel-passageiro' : '../');
   window.location.href = redirect;
 }
 
