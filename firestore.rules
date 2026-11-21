@@ -20,7 +20,8 @@ service cloud.firestore {
 
     match /drivers/{driverId} {
       allow create: if signedIn() && request.auth.uid == driverId;
-      allow read: if activeAdmin() || (signedIn() && resource.data.status == 'approved');
+      // O mapa público pode mostrar apenas transportes aprovados e em rota.
+      allow read: if resource.data.status == 'approved' && resource.data.routeActive == true || activeAdmin() || (signedIn() && request.auth.uid == driverId);
       allow update: if activeAdmin() || (signedIn() && request.auth.uid == driverId && request.resource.data.status == resource.data.status);
       allow delete: if principal();
     }

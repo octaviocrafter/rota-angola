@@ -4,17 +4,41 @@ const status = (text) => { const node = document.querySelector('#gps-status'); i
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
 const maskPhone = (phone) => { const value = String(phone || ''); return value.length > 6 ? `${value.slice(0, 3)} *** ${value.slice(-3)}` : 'Contacto protegido'; };
 
-function startGps(uid) { if (!navigator.geolocation) { status('Este dispositivo não disponibiliza GPS.'); return; } watchId = navigator.geolocation.watchPosition(async (position) => { try { await setDoc(doc(db, 'drivers', uid), { lat: position.coords.latitude, lon: position.coords.longitude, locationSharing: true, locationUpdatedAt: serverTimestamp() }, { merge: true }); status(`GPS activo · precisão aproximada ${Math.round(position.coords.accuracy)} m`); } catch (error) { status(`GPS não guardado: ${error.message}`); } }, () => status('Permissão de localização recusada.'), { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }); }
-function stopGps(uid) { if (watchId !== null) navigator.geolocation.clearWatch(watchId); watchId = null; setDoc(doc(db, 'drivers', uid), { locationSharing: false, locationUpdatedAt: serverTimestamp() }, { merge: true }).catch(() => {}); status('Partilha GPS parada.'); }
+async function startRoute(uid) {
+  if (!navigator.geolocation) { status('Este dispositivo não disponibiliza GPS.'); return; }
+  try {
+    await setDoc(doc(db, 'drivers', uid), { routeActive: true, locationSharing: true, routeStartedAt: serverTimestamp() }, { merge: true });
+    status('Rota iniciada. A localizar o transporte…');
+    startGps(uid);
+  } catch (error) { status('Não foi possível iniciar a rota. Tente novamente.'); }
+}
+
+function startGps(uid) {
+  if (!navigator.geolocation) { status('Este dispositivo não disponibiliza GPS.'); return; }
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = navigator.geolocation.watchPosition(async (position) => {
+    try {
+      await setDoc(doc(db, 'drivers', uid), { lat: position.coords.latitude, lon: position.coords.longitude, locationSharing: true, routeActive: true, locationUpdatedAt: serverTimestamp() }, { merge: true });
+      status(`Rota activa · precisão aproximada ${Math.round(position.coords.accuracy)} m`);
+    } catch (error) { status('A localização não pôde ser actualizada.'); }
+  }, () => status('Permissão de localização recusada.'), { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 });
+}
+
+async function stopRoute(uid) {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
+  await setDoc(doc(db, 'drivers', uid), { routeActive: false, locationSharing: false, routeStoppedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+  status('Rota terminada. O transporte deixou de aparecer no mapa.');
+}
 
 function renderReservations(snapshot) {
   const root = document.querySelector('#driver-reservations');
   if (!root) return;
   if (snapshot.empty) { root.innerHTML = '<p class="muted-copy">Ainda não existem reservas para este transporte.</p>'; return; }
   root.innerHTML = snapshot.docs.map((item) => { const r = item.data(); const confirmed = r.status === 'confirmed'; const phone = confirmed ? escapeHtml(r.passengerPhone || 'Não indicado') : maskPhone(r.passengerPhone); return `<article class="driver-card"><div class="driver-top"><span class="avatar">${escapeHtml((r.passengerName || 'P').slice(0, 2).toUpperCase())}</span><div><strong>${escapeHtml(r.ticketNumber)}</strong><small>${escapeHtml(r.passengerName)} · ${escapeHtml(r.status)}</small></div></div><div class="driver-meta"><span>${escapeHtml(r.from)} → ${escapeHtml(r.to)}</span><span>Lugar ${escapeHtml(r.seat)}</span></div><div class="driver-meta"><span>${escapeHtml(r.date)} · ${escapeHtml(r.time)}</span><span>${phone}</span></div>${r.status === 'requested' ? `<button class="btn btn-orange" type="button" data-confirm-reservation="${escapeHtml(item.id)}">Confirmar reserva</button>` : `<small>${confirmed ? 'Contacto completo disponível para esta reserva.' : 'Reserva cancelada.'}</small>`}</article>`; }).join('');
-  root.querySelectorAll('[data-confirm-reservation]').forEach((button) => button.addEventListener('click', async () => { button.disabled = true; try { await updateDoc(doc(db, 'reservations', button.dataset.confirmReservation), { status: 'confirmed', confirmedAt: serverTimestamp() }); } catch (error) { button.disabled = false; window.alert(`Não foi possível confirmar: ${error.message}`); } }));
+  root.querySelectorAll('[data-confirm-reservation]').forEach((button) => button.addEventListener('click', async () => { button.disabled = true; try { await updateDoc(doc(db, 'reservations', button.dataset.confirmReservation), { status: 'confirmed', confirmedAt: serverTimestamp() }); } catch (error) { button.disabled = false; window.alert('Não foi possível confirmar a reserva. Tente novamente.'); } }));
 }
 
 function watchReservations(uid) { const reservations = query(collection(db, 'reservations'), where('driverId', '==', uid)); onSnapshot(reservations, renderReservations, () => { const root = document.querySelector('#driver-reservations'); if (root) root.innerHTML = '<p class="muted-copy">Não foi possível carregar as reservas agora.</p>'; }); }
 
-document.addEventListener('DOMContentLoaded', () => { if (!document.body.dataset.driverPage) return; onAuthStateChanged(auth, async (user) => { if (!user) { window.location.href = '../pages/login.html'; return; } const profile = await getDoc(doc(db, 'drivers', user.uid)); if (!profile.exists() || profile.data().status !== 'approved') { status('A conta ainda aguarda aprovação do Administrador.'); return; } document.querySelector('[data-start-gps]')?.addEventListener('click', () => startGps(user.uid)); document.querySelector('[data-stop-gps]')?.addEventListener('click', () => stopGps(user.uid)); watchReservations(user.uid); }); });
+document.addEventListener('DOMContentLoaded', () => { if (!document.body.dataset.driverPage) return; onAuthStateChanged(auth, async (user) => { if (!user) { window.location.href = '../pages/login.html'; return; } const profile = await getDoc(doc(db, 'drivers', user.uid)); if (!profile.exists() || profile.data().status !== 'approved') { status('A conta ainda aguarda aprovação do Administrador.'); return; } document.querySelector('[data-start-route]')?.addEventListener('click', () => startRoute(user.uid)); document.querySelector('[data-stop-route]')?.addEventListener('click', () => stopRoute(user.uid)); document.querySelector('[data-start-gps]')?.addEventListener('click', () => startRoute(user.uid)); document.querySelector('[data-stop-gps]')?.addEventListener('click', () => stopRoute(user.uid)); watchReservations(user.uid); }); });

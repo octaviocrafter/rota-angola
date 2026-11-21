@@ -89,15 +89,16 @@ function drawMarkers() {
 
 function subscribeLiveDrivers() {
   // Apenas motoristas aprovados são lidos no mapa público.
-  const approved = query(collection(db, 'drivers'), where('status', '==', 'approved'));
+  // O motorista só aparece quando inicia a rota; terminar a rota remove-o do mapa.
+  const approved = query(collection(db, 'drivers'), where('status', '==', 'approved'), where('routeActive', '==', true));
   onSnapshot(approved, (snapshot) => {
     liveDrivers = snapshot.docs.map(normalise);
     drawMarkers();
-    document.querySelector('#location-copy').textContent = liveDrivers.length ? 'Transportes aprovados · dados Firestore' : 'Sem transportes activos';
+    document.querySelector('#location-copy').textContent = liveDrivers.length ? 'Transportes em rota · actualização em directo' : 'Sem transportes activos';
   }, () => {
     liveDrivers = [];
     drawMarkers();
-    document.querySelector('#location-copy').textContent = 'Modo demonstração · sem ligação Firestore';
+    document.querySelector('#location-copy').textContent = 'Modo demonstração';
   });
 }
 

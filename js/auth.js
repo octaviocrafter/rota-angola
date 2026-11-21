@@ -25,13 +25,25 @@ function emailFromForm(form) {
 }
 
 function dashboardPath(role, principal) {
-  return principal || role === 'admin' ? 'pages/painel-admin.html' : role === 'driver' ? 'pages/painel-motorista.html' : 'pages/painel-passageiro.html';
+  return principal || role === 'admin' ? 'pages/painel-admin' : role === 'driver' ? 'pages/painel-motorista' : 'pages/painel-passageiro';
+}
+
+function bindLogoutButtons() {
+  document.querySelectorAll('[data-auth-logout], [data-logout]').forEach((button) => {
+    if (button.dataset.logoutBound) return;
+    button.dataset.logoutBound = 'true';
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try { await signOut(auth); window.location.href = window.location.pathname.includes('/pages/') ? '../' : './'; }
+      catch (error) { button.disabled = false; showMessage('Não foi possível terminar a sessão. Tente novamente.', 'error'); }
+    });
+  });
 }
 
 function setupSessionUI() {
   const guestNodes = document.querySelectorAll('[data-auth-guest]');
   const userNodes = document.querySelectorAll('[data-auth-user]');
-  if (!guestNodes.length && !userNodes.length) return;
+  bindLogoutButtons();
   onAuthStateChanged(auth, async (user) => {
     guestNodes.forEach((node) => { node.hidden = Boolean(user); });
     userNodes.forEach((node) => { node.hidden = !user; });
@@ -42,7 +54,7 @@ function setupSessionUI() {
     const destination = dashboardPath(profile.role, principal);
     document.querySelectorAll('[data-account-link]').forEach((node) => { node.href = destination; });
     document.querySelectorAll('[data-auth-name]').forEach((node) => { node.textContent = profile.name || user.displayName || user.email?.split('@')[0] || 'utilizador'; });
-    document.querySelectorAll('[data-auth-logout]').forEach((button) => button.onclick = async () => { await signOut(auth); window.location.href = './'; });
+    bindLogoutButtons();
   });
 }
 
@@ -65,15 +77,17 @@ async function registerProfile(form) {
       driverType: clean(data.driverType), biNumber: clean(data.biNumber), licenseNumber: clean(data.licenseNumber),
       vehicleBrand: clean(data.vehicleBrand), vehicleModel: clean(data.vehicleModel), vehicleColor: clean(data.vehicleColor),
       plate: clean(data.plate), vehicleYear: clean(data.vehicleYear), seats: Number(data.seats || 0),
-      route: clean(data.route), line: clean(data.line), status: 'pending', locationSharing: false
+      route: clean(data.route), line: clean(data.line), status: 'pending', locationSharing: false, routeActive: false
     });
   }
   try {
     await setDoc(doc(db, 'users', uid), profile);
     if (role === 'driver') await setDoc(doc(db, 'drivers', uid), { ...profile, updatedAt: serverTimestamp() });
     await updateProfile(credential.user, { displayName: profile.name });
-    showMessage('Conta criada. O cadastro foi guardado no Firestore e o motorista aguarda aprovação.', 'success');
+    showMessage(role === 'driver' ? 'Conta criada com sucesso. O seu pedido aguarda aprovação.' : 'Conta criada com sucesso. A sua sessão foi iniciada.', 'success');
     form.reset();
+    // O cadastro já inicia a sessão; regressar à página principal evita obrigar o utilizador a fazer login de novo.
+    window.setTimeout(() => { window.location.href = '../'; }, 900);
   } catch (error) {
     // Evita deixar no Authentication uma conta sem perfil quando as regras recusam a gravação.
     try { await deleteUser(credential.user); } catch (cleanupError) { console.warn('[ROTA] limpeza da conta incompleta falhou:', cleanupError); }
@@ -102,21 +116,21 @@ function bindForms() {
     const button = form.querySelector('button[type="submit"]');
     if (button) button.disabled = true;
     try { await registerProfile(form); }
-    catch (error) { showMessage(error.code === 'auth/email-already-in-use' ? 'Este e-mail já tem uma conta. Use o login.' : (error.message || 'Não foi possível concluir o cadastro.'), 'error'); }
+    catch (error) { showMessage(error.code === 'auth/email-already-in-use' ? 'Este e-mail já tem uma conta. Use o botão Entrar.' : 'Não foi possível concluir o cadastro. Verifique os dados e tente novamente.', 'error'); }
     finally { if (button) button.disabled = false; }
   }));
   document.querySelectorAll('[data-login-form]').forEach((form) => form.addEventListener('submit', async (event) => {
     event.preventDefault();
     try { await loginForm(form); }
-    catch (error) { showMessage(error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' ? 'E-mail ou palavra-passe incorrectos.' : (error.message || 'Não foi possível iniciar sessão.'), 'error'); }
+    catch (error) { showMessage(error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' ? 'E-mail ou palavra-passe incorrectos.' : 'Não foi possível iniciar sessão. Tente novamente.', 'error'); }
   }));
   document.querySelectorAll('[data-reset-password]').forEach((button) => button.addEventListener('click', async () => {
     const form = button.closest('form'); const email = emailFromForm(form);
     if (!email) { showMessage('Escreva primeiro o seu e-mail para receber a recuperação da palavra-passe.', 'error'); return; }
     try { await sendPasswordResetEmail(auth, email); showMessage('Enviámos um link de recuperação para o seu e-mail.', 'success'); }
-    catch (error) { showMessage(error.code === 'auth/user-not-found' ? 'Não existe uma conta com este e-mail.' : (error.message || 'Não foi possível enviar a recuperação.'), 'error'); }
+    catch (error) { showMessage(error.code === 'auth/user-not-found' ? 'Não existe uma conta com este e-mail.' : 'Não foi possível enviar a recuperação. Tente novamente.', 'error'); }
   }));
-  document.querySelectorAll('[data-logout]').forEach((button) => button.addEventListener('click', () => signOut(auth).then(() => { window.location.href = '../'; })));
+  bindLogoutButtons();
 }
 
 async function guardAdminPage() {
